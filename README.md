@@ -1,6 +1,6 @@
 # Gaussian process discriminant analysis (GPDA)
 
-Supplementary codes to: Non-stationary Gaussian process discriminant analysis with variable selection for high-dimensional functional data
+Vignette for: Non-stationary Gaussian process discriminant analysis with variable selection for high-dimensional functional data
 
 * * *
 
@@ -29,38 +29,138 @@ and follow the instructions.<br />
 4. Open the dmg file, run the gfortran installer, follow all the instructions.
 
 * * *
-
-# Compute MCC and classification accuracy for simulation 1
+#Load required packages
 ```{r}
-#Download "GPDARversionalFinal.R"
-#Download "GPDAnonStatFinal.cpp"
-#Download "GenSim.R"
-#Download "RunSimulation.R"
-#Change your simulation settings here. Possible values are 1, 2, 3, 4.
-sim.set <- 1
-source("RunSimulation.R")
+Package.Names <- c("Matrix","Rcpp","RcppArmadillo","mvtnorm","optimization","matrixStats","pracma","matrixStats","pracma","VaDA","penalizedLDA","caret","randomForest","LiblineaR","sparseLDA","ggplot2")
 ```
 
-
 * * *
+# Toy example - Breast Cancer MS dataset
+In this toy example, we will fit the GPDA model to the breast cancer MS dataset in the R package ProData. This dataset has been analyzed in section 5 of the reference paper. We begin with some pre-processing steps, which are similar to the steps described in Li et al. (2005).
 
-# Plot results for simulation 1
+Load and import data
 ```{r}
-library(ggplot2)
-#Simulation1
-AccMATRIX1 <- 100 - cbind(Errors1,Errors2,Errors3,Errors4,Errors5,Errors6,Errors7,Errors8)/500*100
-colnames(AccMATRIX1) <- c("GPDA","VNPDA","penLDA-FL","RandomForest","VLDA","SparseLDA","SVM-L2pen","SVM-L1pen")
-MCCMATRIX1 <- cbind(MCC1,MCC2,MCC3,MCC4,MCC5,MCC6,MCC8)*100
-colnames(MCCMATRIX1) <- c("GPDA","VNPDA","penLDA-FL","RandomForest","VLDA","SparseLDA","SVM-L1")
-dat1 = reshape2::melt(AccMATRIX1,varnames=c("Iteration","Method"),value.name="ClassAccs")
-names(dat1) <- c("Iteration","Classifier","Classification_Accs")
-ClassError_plot1 <- ggplot(dat1, aes(x = Classifier, y = Classification_Accs,fill = Classifier)) + geom_boxplot()+ xlab(" ") + ylab("Classification Accuracy Percent") + theme_bw() + scale_fill_manual(values=c("yellow",rep("gray",7))) + theme(text = element_text(size=27)) + theme(axis.text.x = element_text(size = 24, angle = 90, hjust = 1)) + theme(axis.text.y = element_text(size = 24))  +theme(legend.position = "none", strip.text = element_text(size = 24))+theme(panel.border = element_rect(color = "black", fill = NA, size = 1.5), strip.background = element_rect(color = "black", size = 1.5))+ggtitle("Simulation1")
-ClassError_plot1
+library(ProData)
+library(PROcess)
+f45c <- system.file("f45c", package="ProData")
+fs <- dir(f45c,full.names=TRUE)
+data(f45cbmk)
+SpecGrp <- pData(f45cbmk)
+table(SpecGrp[,1])
+```
 
-datMCC1 = reshape2::melt(MCCMATRIX1,varnames=c("Iteration","Method"),value.name="MCCval")
-names(datMCC1) <- c("Iteration","Method","MCC")
-MCC_plot1 <- ggplot(datMCC1, aes(x = Method, y = MCC,fill = Method)) + geom_boxplot()+ xlab(" ") + ylab("Matthews Correlation Coefficient") + theme_bw() + scale_fill_manual(values=c("yellow",rep("gray",6))) + theme(text = element_text(size=27)) + theme(axis.text.x = element_text(size = 24, angle = 90, hjust = 1)) + theme(axis.text.y = element_text(size = 24))  +theme(legend.position = "none", strip.text = element_text(size = 24))+theme(panel.border = element_rect(color = "black", fill = NA, size = 1.5), strip.background = element_rect(color = "black", size = 1.5))+ggtitle("Simulation1")
-MCC_plot1
+Processed markers
+```{r}
+explevels = exprs(f45cbmk)
+detpeaks = rownames(explevels)
+```
+Match spectra to sample data
+```{r}
+gi <- regexpr("i+[0-9]+", fs)
+specName <- substr(fs, gi, gi + attr(gi, "match.length") - 1)
+mt <- match(SpecGrp[, 2], toupper(specName))
+```
+
+Prepare classification response
+```{r}
+N = dim(SpecGrp)[1]
+y = rep(0,N) # HER2 positive
+y[SpecGrp[,1]=="B"] = 1 #healthy
+y[SpecGrp[,1]=="C"] = 2 #ER/PR positive
+y[SpecGrp[,1]=="D"] = 3 #single individual
+```
+
+Use the PROcess package for basic processing of the spectrum data. Process spectrum: baseline subtraction and renormalization
+```{r}
+spec <- rmBaseline(f45c,method="loess", bw=0.1)
+spec <- spec[, mt] #match ordering to phenotype data
+colnames(spec) <- SpecGrp[, 2]
+prospec <- renorm(spec,cutoff = 1000)
+prospec = prospec + 0.5
+prospec = log(prospec)
+```
+
+Time points
+```{r}
+t2 = as.numeric(rownames(prospec))
+TP2 = length(t2)
+```
+
+Plot processed spectrum data for healthy women
+```{r}
+df=data.frame(x = t(matrix(prospec[,y==1], 1,TP2*sum(y==1))), t = matrix(t2,TP2*sum(y==1),1), ind = c(1:sum(y==1))%x%rep(1,TP2))
+df2=data.frame(x =apply(t(prospec[,y==1]),2,mean) , t = t2)
+ggplot(df2, mapping = aes(x = t, y = x)) +
+  geom_line(data = df, mapping = aes(x = t, y = x,  group = ind), colour = "GRAY", alpha = 1/2, size = 1/2) +
+  geom_line(col= "red") +
+  theme_bw() +
+  xlab('m/z') +
+  ylab('log intensity')
+```
+
+Plot processed spectrum data for HER2 positive
+```{r}
+df=data.frame(x = t(matrix(prospec[,y==0], 1,TP2*sum(y==0))), t = matrix(t2,TP2*sum(y==0),1), ind = c(1:sum(y==0))%x%rep(1,TP2))
+df2=data.frame(x =apply(t(prospec[,y==0]),2,mean) , t = t2)
+ggplot(df2, mapping = aes(x = t, y = x)) +
+  geom_line(data = df, mapping = aes(x = t, y = x,  group = ind), colour = "GRAY", alpha = 1/2, size = 1/2) +
+  geom_line(col= "red") +
+  theme_bw() +
+  xlab('m/z') +
+  ylab('log intensity')
+```
+
+Plot mean spectrum across groups
+```{r}
+df=data.frame(x =c(apply(t(prospec[,y==0]),2,mean),apply(t(prospec[,y==1]),2,mean))  , t = rep(t2,2), Class = c(rep("HER2", TP2),rep("control", TP2)))
+ggplot(df, mapping = aes(x = t, y = x)) +
+  geom_line(data = df, mapping = aes(x = t, y = x, colour = Class))  +
+  theme_bw() +
+  xlab('m/z') +
+  ylab('log intensity')
+```
+
+Subset to HER2 positive and healthy women only, then scale data
+```{r}
+vy = as.numeric(as.factor(y[y<=1]))-1
+combineX = t(prospec[,y<=1])
+combineXscale <- 10*(combineX - mean(combineX))
+p=ncol(combineXscale)
+n <- length(vy)
+```
+
+Fit GPDA model. Description of the input arguments: mXtrain is an $n_{\text{train}} \times p$ matrix of predictors for training dataset. vytrain is a vector of size $n_{\text{train}}$ of class labels for training dataset. mXtest is an $n_{\text{test}} \times p$ matrix of predictors for testing dataset. train.cycles is the number of VB cycles for posterior inference phase of the algorithm. test.cycles is the number of VB cycles for classification phase of the algorithm. delta is the distance between adjacent locations.
+```{r}
+GPobj <- GPDA.sparse.NonStat(mXtrain = combineXscale, vytrain = vy, mXtest = combineXscale, train.cycles = 5, test.cycles = 3, delta = 1)
+```
+
+Obtain predicted class labels
+```{r}
+c(GPobj$xi)
+```
+
+Obtain posterior probability of $\gamma(t)=1$ for all locations
+```{r}
+c(GPobj$vw)
+```
+
+Plot posterior expectation of location-varying length scale of first observation.
+```{r}
+#Observation-specific log length scale perturbation
+GPobj$zeta
+#Common component of log length scale perturbation
+c(GPobj$mS)
+#Posterior expectation of length-scale for first observation
+plot.ts(exp(c(GPobj$mS)+GPobj$zeta[1]))
+```
+
+Plot posterior expectation of $z_1(t)$. Note that $q(z_1) = \text{LogN}(m_{z_1}, \Sigma_{z_1})$.
+```{r}
+#Diagonal entries of \Sigma_{z_1}
+GPobj$Sigma_Z[,1,1]
+#m_{z_1}
+GPobj$mZ[1,]
+plot.ts(GPobj$mZ[1,]+GPobj$Sigma_Z[,1,1])
 ```
 
 * * *
