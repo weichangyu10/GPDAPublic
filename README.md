@@ -32,7 +32,7 @@ and follow the instructions.<br />
 In this toy example, we will fit the GPDA model to the breast cancer MS dataset in the R package ProData. This dataset has been analyzed in section 5 of the reference paper. We begin with some pre-processing steps, which are similar to the steps described in Li et al. (2005). Note that outputs for the following example are embeded in Vignette.pdf.
 
 Load required packages
-```{r}
+```{r,results='hide',message=FALSE,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 Package.Names <- c("Matrix","Rcpp","RcppArmadillo","mvtnorm","optimization","matrixStats","matrixStats","ggplot2","formatR")
 lapply(Package.Names, library, character.only = TRUE)
 sourceCpp("GPDAnonStatFinal.cpp")
@@ -40,7 +40,9 @@ source("GPDARversionFinal.R")
 ```
 
 Load and import data
-```{r}
+```{r,message=FALSE,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+#BiocManager::install("PROcess")
+#BiocManager::install("ProData")
 library(ProData)
 library(PROcess)
 f45c <- system.file("f45c", package="ProData")
