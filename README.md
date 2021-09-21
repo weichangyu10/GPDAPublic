@@ -4,7 +4,7 @@ Vignette for: Non-stationary Gaussian process discriminant analysis with variabl
 
 * * *
 
-# Prerequisite packages
+# Prerequisite packages for all codes in this repository
 
 Please ensure that you have the following R packages fully installed and functional before proceeding to run any code on this repository: Matrix; Rcpp; RcppArmadillo; mvtnorm; optimization; matrixStats; pracma; VaDA (link [here](https://github.com/weichangyu10/VaDA)); penalizedLDA; caret; randomForest; LiblineaR; sparseLDA; ggplot2
 
@@ -28,15 +28,16 @@ and follow the instructions.<br />
 &nbsp; &nbsp;&nbsp;
 4. Open the dmg file, run the gfortran installer, follow all the instructions.
 
-* * *
-#Load required packages
-```{r}
-Package.Names <- c("Matrix","Rcpp","RcppArmadillo","mvtnorm","optimization","matrixStats","pracma","matrixStats","pracma","VaDA","penalizedLDA","caret","randomForest","LiblineaR","sparseLDA","ggplot2")
-```
-
-* * *
 # Toy example - Breast Cancer MS dataset
-In this toy example, we will fit the GPDA model to the breast cancer MS dataset in the R package ProData. This dataset has been analyzed in section 5 of the reference paper. We begin with some pre-processing steps, which are similar to the steps described in Li et al. (2005).
+In this toy example, we will fit the GPDA model to the breast cancer MS dataset in the R package ProData. This dataset has been analyzed in section 5 of the reference paper. We begin with some pre-processing steps, which are similar to the steps described in Li et al. (2005). Note that outputs for the following example are embeded in Vignette.pdf.
+
+Load required packages
+```{r}
+Package.Names <- c("Matrix","Rcpp","RcppArmadillo","mvtnorm","optimization","matrixStats","matrixStats","ggplot2","formatR")
+lapply(Package.Names, library, character.only = TRUE)
+sourceCpp("GPDAnonStatFinal.cpp")
+source("GPDARversionFinal.R")
+```
 
 Load and import data
 ```{r}
@@ -54,6 +55,7 @@ Processed markers
 explevels = exprs(f45cbmk)
 detpeaks = rownames(explevels)
 ```
+
 Match spectra to sample data
 ```{r}
 gi <- regexpr("i+[0-9]+", fs)
@@ -136,12 +138,12 @@ GPobj <- GPDA.sparse.NonStat(mXtrain = combineXscale, vytrain = vy, mXtest = com
 
 Obtain predicted class labels
 ```{r}
-c(GPobj$xi)
+#c(GPobj$xi)
 ```
 
 Obtain posterior probability of $\gamma(t)=1$ for all locations
 ```{r}
-c(GPobj$vw)
+#c(GPobj$vw)
 ```
 
 Plot posterior expectation of location-varying length scale of first observation.
@@ -149,18 +151,31 @@ Plot posterior expectation of location-varying length scale of first observation
 #Observation-specific log length scale perturbation
 GPobj$zeta
 #Common component of log length scale perturbation
-c(GPobj$mS)
+#c(GPobj$mS)
 #Posterior expectation of length-scale for first observation
-plot.ts(exp(c(GPobj$mS)+GPobj$zeta[1]))
+LengthScaleObs1 <- exp(c(GPobj$mS)+GPobj$zeta[1])
+
+df=data.frame(x = LengthScaleObs1, t = t2[1:(TP2-1)])
+ggplot(df, mapping = aes(x = t, y = x)) +
+  geom_line(data = df, mapping = aes(x = t, y = x))  +
+  theme_bw() +
+  xlab('m/z') +
+  ylab('Length scale')
 ```
 
 Plot posterior expectation of $z_1(t)$. Note that $q(z_1) = \text{LogN}(m_{z_1}, \Sigma_{z_1})$.
 ```{r}
 #Diagonal entries of \Sigma_{z_1}
-GPobj$Sigma_Z[,1,1]
+#GPobj$Sigma_Z[,1,1]
 #m_{z_1}
-GPobj$mZ[1,]
-plot.ts(GPobj$mZ[1,]+GPobj$Sigma_Z[,1,1])
+#GPobj$mZ[1,]
+z <- GPobj$mZ[1,]+0.5*GPobj$Sigma_Z[,1,1]
+df=data.frame(x = z, t = t2)
+ggplot(df, mapping = aes(x = t, y = x)) +
+  geom_line(data = df, mapping = aes(x = t, y = x))  +
+  theme_bw() +
+  xlab('m/z') +
+  ylab('E_q[Z(t)]')
 ```
 
 * * *
