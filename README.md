@@ -132,12 +132,8 @@ combineXscale <- 10*(combineX - mean(combineX))
 p=ncol(combineXscale)
 n <- length(vy)
 ```
- <!-- MathJax -->
-    <script type="text/javascript"
-      src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
-    </script>
     
-Fit GPDA model. Description of the input arguments: mXtrain is a $n_{\text{train}} \times p$ matrix of predictors for training dataset. vytrain is a vector of size $n_{\text{train}}$ of class labels for training dataset. mXtest is an $n_{\text{test}} \times p$ matrix of predictors for testing dataset. train.cycles is the number of VB cycles for posterior inference phase of the algorithm. test.cycles is the number of VB cycles for classification phase of the algorithm. delta is the distance between adjacent locations.
+Fit GPDA model. Description of the input arguments: mXtrain is a n.train by p matrix of predictors for training dataset. vytrain is a vector of size n.train of class labels for training dataset. mXtest is an n.test by p matrix of predictors for testing dataset. train.cycles is the number of VB cycles for posterior inference phase of the algorithm. test.cycles is the number of VB cycles for classification phase of the algorithm. delta is the distance between adjacent locations.
 ```{r}
 GPobj <- GPDA.sparse.NonStat(mXtrain = combineXscale, vytrain = vy, mXtest = combineXscale, train.cycles = 5, test.cycles = 3, delta = 1)
 ```
@@ -147,7 +143,7 @@ Obtain predicted class labels
 #c(GPobj$xi)
 ```
 
-Obtain posterior probability of $\gamma(t)=1$ for all locations
+Obtain posterior probability of gamma = 1 for all locations
 ```{r}
 #c(GPobj$vw)
 ```
@@ -169,7 +165,7 @@ ggplot(df, mapping = aes(x = t, y = x)) +
   ylab('Length scale')
 ```
 
-Plot posterior expectation of $z_1(t)$. Note that $q(z_1) = \text{LogN}(m_{z_1}, \Sigma_{z_1})$.
+Plot posterior expectation of the first observation-specific latent process.
 ```{r}
 #Diagonal entries of \Sigma_{z_1}
 #GPobj$Sigma_Z[,1,1]
