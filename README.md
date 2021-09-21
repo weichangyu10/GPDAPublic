@@ -132,8 +132,12 @@ combineXscale <- 10*(combineX - mean(combineX))
 p=ncol(combineXscale)
 n <- length(vy)
 ```
-
-Fit GPDA model. Description of the input arguments: mXtrain is an $n_{\text{train}} \times p$ matrix of predictors for training dataset. vytrain is a vector of size $n_{\text{train}}$ of class labels for training dataset. mXtest is an $n_{\text{test}} \times p$ matrix of predictors for testing dataset. train.cycles is the number of VB cycles for posterior inference phase of the algorithm. test.cycles is the number of VB cycles for classification phase of the algorithm. delta is the distance between adjacent locations.
+ <!-- MathJax -->
+    <script type="text/javascript"
+      src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    
+Fit GPDA model. Description of the input arguments: mXtrain is a $n_{\text{train}} \times p$ matrix of predictors for training dataset. vytrain is a vector of size $n_{\text{train}}$ of class labels for training dataset. mXtest is an $n_{\text{test}} \times p$ matrix of predictors for testing dataset. train.cycles is the number of VB cycles for posterior inference phase of the algorithm. test.cycles is the number of VB cycles for classification phase of the algorithm. delta is the distance between adjacent locations.
 ```{r}
 GPobj <- GPDA.sparse.NonStat(mXtrain = combineXscale, vytrain = vy, mXtest = combineXscale, train.cycles = 5, test.cycles = 3, delta = 1)
 ```
