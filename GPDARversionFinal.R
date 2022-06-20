@@ -200,14 +200,13 @@ SetInitialXi <- function(mXtrain, vytrain, mXtest ,alpha=0.90, delta=0){
   
 }
 
-GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test.cycles = 3, delta){
+GPDA.sparse.NonStat<- function(mXtrain, vytrain, mXtest, train.cycles = 5, test.cycles = 3, delta, alpha, beta,zeta.init=0){
   
   ntrain <- nrow(mXtrain)
   ntest <- nrow(mXtest)
   n1train <- sum(vytrain)
   n0train <- ntrain - n1train
   p <- ncol(mXtrain)
-  
   
   mZ <- matrix(0,nrow=ntrain,ncol=p)
   EDepsInv <- 1/cbind(colVars(mXtrain[vytrain==1,]),colVars(mXtrain[vytrain==0,]),colVars(mXtrain))
@@ -220,16 +219,16 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
   Sigma_Z = array(0,dim=c(p,2,ntrain))
   Sigma_Z[,1,] <- rep(10^(-8),ntrain)
   
-  m.tau.inv <- 0.1
-  tau2 <- 1
+  m.tau.inv <- 3
+  tau2 <- 2
   delta <- 1
-  tau_star2 <- 1
-  lambda.star <- 6
-  mu.lambda <- log(3)
+  tau_star2 <- 2
+  lambda.star <- 50
+  mu.lambda <- log(50)
   s2.lambda <- 0.25
   
   lambdaTS <- 1
-  alpha <- (log(p)); beta <- 4
+  
   nustar1.est <- c(rep(log(0.5),round(p/2)), rep(log(3),p-round(p/2)-1))
   nustar0.est <- c(rep(log(0.5),round(p/2)), rep(log(3),p-round(p/2)-1))
   nustar.est <- c(rep(log(0.5),round(p/2)), rep(log(3),p-round(p/2)-1))
@@ -237,11 +236,11 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
   SigmaNuStar0.est <- cbind(rep(0.1,p-1),rep(0,p-1))
   SigmaNuStar.est <- cbind(rep(0.1,p-1),rep(0,p-1))
   
-  muS = rep(0,p-1)
-  zeta = rep(0,ntrain)
+  muS = rep(5,p-1)
+  zeta = rep(zeta.init,ntrain)
 
   xi <- rep(0.5,ntest)
-  zetaPred = rep(0,ntest)
+  zetaPred = rep(2,ntest)
   
   B.nustar <- 4000
   
@@ -257,6 +256,7 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
       B.nustar1 = 4000
       
     }
+    
     ###Update mu#######
     MuObj <- FitMu(X=mXtrain,y=vytrain,mZ=mZ,EDepsInv = EDepsInv,vw = vw, NuStarEst1 = nustar1.est, NuStarEst0 = nustar0.est, NuStarEst = nustar.est, VarNuStar1 = SigmaNuStar1.est[,1], VarNuStar0 = SigmaNuStar0.est[,1], VarNuStar = SigmaNuStar.est[,1], m_tau_nu_inv1 = m_tau_nu_inv1, m_tau_nu_inv0 = m_tau_nu_inv0, m_tau_nu_inv = m_tau_nu_inv,delta = delta)
     m_mu1 <- MuObj$m_mu1
@@ -279,7 +279,7 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
     r.tau.star <- TauStarObj[1,1]
     s.tau.star <- TauStarObj[2,1]
     m_tau_star_inv <- r.tau.star/s.tau.star
-
+    
     ###Update nu.star#########
     SVBnustar1Obj <- PrecSVBforNuCpp(mZi= m_mu1, SigmaZi = Sigma_Mu1, m_tau_invTS = m_tau_star_inv1, delta=delta, tau2 = tau2, lambda = lambda.star, mStart = rnorm(p-1),B=B.nustar1)
     nustar1.est <- SVBnustar1Obj$mStore
@@ -306,16 +306,22 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
     NuNustarTotal <- SigmaNuStar1.est[1:(p-2),2] + nustar1.est[1:(p-2)]*nustar1.est[2:(p-1)] + SigmaNuStar0.est[1:(p-2),2] + nustar0.est[1:(p-2)]*nustar0.est[2:(p-1)] + SigmaNuStar.est[1:(p-2),2] + nustar.est[1:(p-2)]*nustar.est[2:(p-1)]
     OptLambdaStarObj <- OptimizeLambda(ENusqTotal = NustarsqTotal, ENuNuTotal = NuNustarTotal, m_tau2_inv = (1/tau2), mu.lambda = mu.lambda, s2.lambda = s2.lambda, samp.size = 3, delta = delta)
     lambda.star <- exp(OptLambdaStarObj)
-
+    
     ###Update epsilon#########
     EpsilonRObj <- FitEpsilonRversion(X=mXtrain,y=vytrain,mZ=mZ, m_mu1 = m_mu1, m_mu0 = m_mu0, m_mu = m_mu, VarMu1 = Sigma_Mu1[,1], VarMu0 = Sigma_Mu0[,1], VarMu = Sigma_Mu[,1], VarZ = t(Sigma_Z[,1,]), vw = vw, Aeps = 0.00001,Beps = 0.000001)
     EDepsInv <- EpsilonRObj$EDepsInv
     ElogSigmaSq <- EpsilonRObj$ELogeps
-    #cat("done epsilon","\n")
+    
     if(cyc.count==1){
       
       mS = nustar.est
       Sigma_S = SigmaNuStar.est
+      if(min(mS)<0){
+        
+        zeta <- rep(-min(mS)+0.1,ntrain)
+        
+      }
+      
       
     }
     
@@ -323,19 +329,21 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
     ZObj <- FitZ(X = mXtrain, y=vytrain, m_mu1 =m_mu1, m_mu0 = m_mu0, m_mu = m_mu, vw=vw, mEpsilonInvMAT = EDepsInv, zeta = zeta, mS=mS, Sigma_S = Sigma_S, m_tau_inv = m.tau.inv,delta = delta)
     mZ <- ZObj$mZ
     Sigma_Z <- ZObj$SigmaZ
-    
+
     ###Update tauTS#########
-    TauTSobj <- FitTauTS2(mZ = mZ, SigmaZ = Sigma_Z, mS = mS, Sigma_S = Sigma_S, zeta=zeta, atauTS = 0.01, btauTS = 0.01,delta=delta)
+    TauTSobj <- FitTauTS2(mZ = mZ, SigmaZ = Sigma_Z, mS = mS, Sigma_S = Sigma_S, zeta=zeta, atauTS = 0.01, btauTS = 0.01,delta=delta)  
     m.tau.inv <- TauTSobj$rtauTS/TauTSobj$stauTS
-    
+
     ###Update Gamma#########
     GammaObj <- FitGamma(X=mXtrain, y = vytrain, mZ = mZ, SigmaZ = Sigma_Z, m_mu1 = m_mu1, m_mu0 = m_mu0, m_mu = m_mu, Sigma_Mu1 = Sigma_Mu1, Sigma_Mu0 = Sigma_Mu0, Sigma_Mu = Sigma_Mu , vwOLD = vw, mEpsilonInvMAT = EDepsInv, mLogEpsilonMAT = ElogSigmaSq, delta = 1, alpha = alpha, beta = beta)
     vw <- GammaObj$vw
-    
+
     ###Update alphabeta#########
     sumW <- sum(vw)
     sumAdjW <- sum(vw[1:(p-1)]*vw[2:p])
-    
+    OptBetaObj <- OptBeta(sumW=sumW,sumAdjW = sumAdjW, mu.beta=log(0.5),sigma2.beta = 0.3,mu.alpha = 5,sigma2.alpha = 0.01,p=p)
+    alpha <- OptBetaObj[1]
+    beta <- OptBetaObj[2]
     
     ###Update S###############
     Ezsq <- (mZ^2 + t(Sigma_Z[,1,]))
@@ -349,12 +357,12 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
     G4 <- colSums(Ezsq)
     G5 <- colSums(Ezz)
     
-    Sobj <- PrecSVBforSCpp(G1=G1, G2=G2, G3=G3, G4=G4, G5=G5, m_tau_inv=m.tau.inv, muS = muS, tau2 = tau2, lambda=lambdaTS, mStart = mS, delta=delta, B= 5100, zeta=zeta)
+    Sobj <- PrecSVBforSCpp(G1=G1, G2=G2, G3=G3, G4=G4, G5=G5, m_tau_inv=m.tau.inv, muS = muS, tau2 = tau2, lambda=lambdaTS, mStart = mS, delta=delta, B= 10100, zeta=zeta)
     mS <- Sobj$mStore
     MainDiagOmegaS <- c(Sobj$OmegaStore[1,1]^2,Sobj$OmegaStore[1:(p-2),2]^2+Sobj$OmegaStore[2:(p-1),1]^2)
     OffDiagOmegaS <- c(Sobj$OmegaStore[1:(p-2),2]*Sobj$OmegaStore[1:(p-2),1],0)
     Sigma_S <- BandedCholToInvNonStat2(MainDiagOmegaS, OffDiagOmegaS)
-    
+
     ###Update lambdaTS###############
     SsqTotal <- Sigma_S[,1] + mS^2
     SSTotal <- Sigma_S[1:(p-2),2] + mS[1:(p-2)]*mS[2:(p-1)]
@@ -367,7 +375,7 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
     
     cat("finished with ", cyc.count, "\n")
   }
-
+  
   SigmaZPred = array(0,dim=c(p,2,ntest))
   mZPred <- matrix(0,nrow=ntest,ncol=p)
   Sigma_Z1.start <- rowMeans(Sigma_Z[,1,])
@@ -380,8 +388,6 @@ GPDA.sparse.NonStat <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test
   }
   
   xi <- SetInitialXi(mXtrain = t(mXtrain), vytrain = c(2-vytrain), mXtest = t(mXtest), alpha=0.9, delta=0)
-  
-  
   for(cyc.count.test in 1:test.cycles){
     
     PredZObj <- FitPredZ(X = mXtest, xi = xi, m_mu1 = m_mu1, m_mu0 = m_mu0, m_mu = m_mu, vw = vw, mEpsilonInvMAT = EDepsInv, zeta = zetaPred, mS=mS, Sigma_S = Sigma_S, m_tau_inv = m.tau.inv, delta = delta)
@@ -429,5 +435,156 @@ Calc.MCC <- function(predvec,truevec){
   MCC.val <- (P.plus*N.minus - P.minus*N.plus)/sqrt((P.plus+P.minus)*(P.plus+N.plus)*(N.minus+P.minus)*(N.minus+N.plus))
 
   return(MCC.val)
+  
+}
+
+GPDA.sparse.Stat.Revised <- function(mXtrain, vytrain, mXtest, train.cycles = 5, test.cycles = 3, delta){
+  
+  ntrain <- nrow(mXtrain)
+  ntest <- nrow(mXtest)
+  n1train <- sum(vytrain)
+  n0train <- ntrain - n1train
+  p <- ncol(mXtrain)
+  
+  mu.lambda <- log(3)
+  s2.lambda <- 0.25
+  
+  
+  mZ <- matrix(0,nrow=ntrain,ncol=p)
+  EDepsInv <- 1/cbind(colVars(mXtrain[vytrain==1,]),colVars(mXtrain[vytrain==0,]),colVars(mXtrain))
+  vw <- 1-(0.5+apply(mXtrain,2,function(s){ t.test(s[vytrain==1],s[vytrain==0],var.equal = TRUE)$p.value }))/2
+  
+  m.tau.inv.tilde1 = 1
+  m.tau.inv.tilde0 = 1
+  m.tau.inv.tilde = 1
+  
+  Sigma_Z = array(0,dim=c(p,2,ntrain))
+  Sigma_Z[,1,] <- rep(10^(-8),ntrain)
+  
+  m.lambda.tilde1 <- 10; m.lambda.tilde0 <- 10; m.lambda.tilde <- 10
+  s2.lambda.tilde1 <- 1; s2.lambda.tilde0 <- 1; s2.lambda.tilde <- 1
+  Qstardiag1 <- rep(0,p)
+  Qstardiag0 <- rep(0,p)
+  Qstardiag <- rep(0,p)
+  Qstardiag1[1:(p-1)] <- 0.5*exp(m.lambda.tilde1 + 0.5*s2.lambda.tilde1)/delta - 1 + 0.5*delta*exp(-m.lambda.tilde1 + 0.5*s2.lambda.tilde1)
+  Qstardiag1[2:p] <- Qstardiag1[2:p] + 0.5*exp(m.lambda.tilde1 + 0.5*s2.lambda.tilde1)/delta
+  Qstardiag1[1] <- Qstardiag1[1] + 1
+  Qstardiag1 <- Qstardiag1*m.tau.inv.tilde1
+  
+  Qstardiag0[1:(p-1)] <- 0.5*exp(m.lambda.tilde0 + 0.5*s2.lambda.tilde0)/delta - 1 + 0.5*delta*exp(-m.lambda.tilde0 + 0.5*s2.lambda.tilde0)
+  Qstardiag0[2:p] <- Qstardiag0[2:p] + 0.5*exp(m.lambda.tilde0 + 0.5*s2.lambda.tilde0)/delta
+  Qstardiag0[1] <- Qstardiag0[1] + 1
+  Qstardiag0 <- Qstardiag0*m.tau.inv.tilde0
+  
+  Qstardiag[1:(p-1)] <- 0.5*exp(m.lambda.tilde + 0.5*s2.lambda.tilde)/delta - 1 + 0.5*delta*exp(-m.lambda.tilde + 0.5*s2.lambda.tilde)
+  Qstardiag[2:p] <- Qstardiag[2:p] + 0.5*exp(m.lambda.tilde + 0.5*s2.lambda.tilde)/delta
+  Qstardiag[1] <- Qstardiag[1] + 1
+  Qstardiag <- Qstardiag*m.tau.inv.tilde
+  
+  Qstaroffdiag1 <- 0.5 - 0.5*exp(m.lambda.tilde1 + 0.5*s2.lambda.tilde1)/delta
+  Qstaroffdiag0 <- 0.5 - 0.5*exp(m.lambda.tilde0 + 0.5*s2.lambda.tilde0)/delta
+  Qstaroffdiag <- 0.5 - 0.5*exp(m.lambda.tilde + 0.5*s2.lambda.tilde)/delta
+  
+  
+  lambdaTS <- 10
+  alpha <- (log(p)); beta <- 4
+  m.tau.inv <- 1
+  
+  
+  for(cyc.count in 1:train.cycles){
+    
+    if(cyc.count==1){
+      
+      B.nustar1 = 8000
+      
+    }
+    else{
+      
+      B.nustar1 = 4000
+      
+    }
+    ###Update mu#######
+    MuObj <- Update_Muk_Stat(vy=vytrain, mX = mXtrain, EDepsInv = EDepsInv, vw = vw, mZ = mZ, Qstardiag1 = Qstardiag1, Qstaroffdiag1  = Qstaroffdiag1, Qstardiag0 = Qstardiag0, Qstaroffdiag0 = Qstaroffdiag0, Qstardiag = Qstardiag, Qstaroffdiag = Qstaroffdiag)
+    m_mu1 <- MuObj$m_mu1
+    m_mu0 <- MuObj$m_mu0
+    m_mu <- MuObj$m_mu
+    Sigma_Mu1 <- MuObj$Sigma_Mu1
+    Sigma_Mu0 <- MuObj$Sigma_Mu0
+    Sigma_Mu <- MuObj$Sigma_Mu
+    
+    TauStar1Obj <- FitTauStar(m_mu = m_mu1, Sigma_Mu = Sigma_Mu1, nu_est = rep(m.lambda.tilde1, p-1), VarNuStar = rep(0,p-1), Atau_star = 1,Btau_star = 1,delta = delta)
+    r.tau.star1 <- TauStar1Obj[1,1]
+    s.tau.star1 <- TauStar1Obj[2,1]
+    m_tau_star_inv1 <- r.tau.star1/s.tau.star1
+    TauStar0Obj <- FitTauStar(m_mu = m_mu0, Sigma_Mu = Sigma_Mu0, nu_est = rep(m.lambda.tilde0, p-1), VarNuStar = rep(0,p-1), Atau_star = 1,Btau_star = 1,delta = delta)
+    r.tau.star0 <- TauStar0Obj[1,1]
+    s.tau.star0 <- TauStar0Obj[2,1]
+    m_tau_star_inv0 <- r.tau.star0/s.tau.star0
+    TauStarObj <- FitTauStar(m_mu = m_mu, Sigma_Mu = Sigma_Mu, nu_est = rep(m.lambda.tilde, p-1), VarNuStar = rep(0,p-1), Atau_star = 1,Btau_star = 1,delta = delta)
+    r.tau.star <- TauStarObj[1,1]
+    s.tau.star <- TauStarObj[2,1]
+    m_tau_star_inv <- r.tau.star/s.tau.star
+    
+    
+    MustarsqTotal1 <- Sigma_Mu1[,1] + m_mu1^2
+    MuMustarTotal1 <- Sigma_Mu1[1:(p-1),2] + m_mu1[1:(p-1)]*m_mu1[2:(p)] 
+    MustarsqTotal0 <- Sigma_Mu0[,1] + m_mu0^2
+    MuMustarTotal0 <- Sigma_Mu0[1:(p-1),2] + m_mu0[1:(p-1)]*m_mu0[2:(p)] 
+    MustarsqTotal <- Sigma_Mu[,1] + m_mu^2
+    MuMustarTotal <- Sigma_Mu[1:(p-1),2] + m_mu[1:(p-1)]*m_mu[2:(p)]
+    OptLambdaStarObj1 <- OptimizeLambda(ENusqTotal = MustarsqTotal1, ENuNuTotal = MuMustarTotal1, m_tau2_inv = 1, mu.lambda = mu.lambda, s2.lambda = s2.lambda, samp.size = 3, delta = delta)
+    lambda.star1 <- exp(OptLambdaStarObj1)
+    OptLambdaStarObj0 <- OptimizeLambda(ENusqTotal = MustarsqTotal0, ENuNuTotal = MuMustarTotal0, m_tau2_inv = 1, mu.lambda = mu.lambda, s2.lambda = s2.lambda, samp.size = 3, delta = delta)
+    lambda.star0 <- exp(OptLambdaStarObj0)
+    OptLambdaStarObj <- OptimizeLambda(ENusqTotal = MustarsqTotal, ENuNuTotal = MuMustarTotal, m_tau2_inv = 1, mu.lambda = mu.lambda, s2.lambda = s2.lambda, samp.size = 3, delta = delta)
+    lambda.star <- exp(OptLambdaStarObj)
+    
+    ZObj <- FitZ(X = mXtrain, y=vytrain, m_mu1 =m_mu1, m_mu0 = m_mu0, m_mu = m_mu, vw=vw, mEpsilonInvMAT = EDepsInv, zeta = rep(0,ntrain), mS=rep( log(lambdaTS), p-1 ), Sigma_S = matrix(0,nrow=(p-1),ncol=2), m_tau_inv = m.tau.inv,delta = delta)
+    mZ <- ZObj$mZ
+    Sigma_Z1 <- ZObj$SigmaZ[,,which(vytrain==1)[1]]
+    Sigma_Z0 <- ZObj$SigmaZ[,,which(vytrain==0)[1]]
+    
+    
+    TauTSobj <- FitTauTS2(mZ = mZ, SigmaZ = Sigma_Z, mS = rep( log(lambdaTS), p-1 ), Sigma_S = matrix(0,nrow=(p-1),ncol=2), zeta=rep(0,ntrain), atauTS = 0.01, btauTS = 0.01,delta=delta)
+    m.tau.inv <- TauTSobj$rtauTS/TauTSobj$stauTS
+    
+    #browser()
+    EZsqTotal <- sum(vytrain==1)*Sigma_Z1[,1] + sum(vytrain==0)*Sigma_Z0[,1] + colSums(mZ^2)
+    EzzTotal <-   sum(vytrain==1)*Sigma_Z1[1:(p-1),2] + sum(vytrain==0)*Sigma_Z0[1:(p-1),2] + colSums(mZ[,1:(p-1)]*mZ[,2:p])
+    OptLambdaTSObj <- OptimizeLambda(ENusqTotal = EZsqTotal, ENuNuTotal = EzzTotal, m_tau2_inv = m.tau.inv, mu.lambda = mu.lambda, s2.lambda = s2.lambda, samp.size = ntrain, delta = delta)
+    lambdaTS <- exp(OptLambdaTSObj)
+    
+    
+    
+    VarZ <- matrix(0,nrow=nrow(mZ),ncol=ncol(mZ))
+    VarZ[vytrain==1,] <- matrix(rep(Sigma_Z1[,1],sum(vytrain)), nrow = sum(vytrain), ncol=p,byrow=TRUE)
+    VarZ[vytrain==0,] <- matrix(rep(Sigma_Z0[,1],(ntrain-sum(vytrain)) ), nrow = (ntrain-sum(vytrain)), ncol=p,byrow=TRUE)
+    EpsilonRObj <- FitEpsilonRversion(X=mXtrain,y=vytrain,mZ=mZ, m_mu1 = m_mu1, m_mu0 = m_mu0, m_mu = m_mu, VarMu1 = Sigma_Mu1[,1], VarMu0 = Sigma_Mu0[,1], VarMu = Sigma_Mu[,1], VarZ = VarZ, vw = vw, Aeps = 0.00001,Beps = 0.000001)
+    EDepsInv <- EpsilonRObj$EDepsInv
+    ElogSigmaSq <- EpsilonRObj$ELogeps
+    
+    ###Update Gamma#########
+    GammaObj <- FitGamma(X=mXtrain, y = vytrain, mZ = mZ, SigmaZ = Sigma_Z, m_mu1 = m_mu1, m_mu0 = m_mu0, m_mu = m_mu, Sigma_Mu1 = Sigma_Mu1, Sigma_Mu0 = Sigma_Mu0, Sigma_Mu = Sigma_Mu , vwOLD = vw, mEpsilonInvMAT = EDepsInv, mLogEpsilonMAT = ElogSigmaSq, delta = 1, alpha = alpha, beta = beta)
+    vw <- GammaObj$vw
+    #cat("done gamma","\n")
+    
+    ###Update alphabeta#########
+    sumW <- sum(vw)
+    sumAdjW <- sum(vw[1:(p-1)]*vw[2:p])
+    #browser()
+    
+  }
+  xi <- rep(0.5,ntest)
+  xi <- SetInitialXi(mXtrain = t(mXtrain), vytrain = c(2-vytrain), mXtest = t(mXtest), alpha=0.7, delta=0.3)
+  for(cyc.count.test in 1:test.cycles){
+    
+    PredZObj <- FitPredZ(X = mXtest, xi = xi, m_mu1 = m_mu1, m_mu0 = m_mu0, m_mu = m_mu, vw = vw, mEpsilonInvMAT = EDepsInv, zeta = rep(0,ntest), mS=rep( log(lambdaTS), p-1 ), Sigma_S = matrix(0,nrow=(p-1),ncol=2), m_tau_inv = m.tau.inv, delta = delta)
+    mZPred <- PredZObj$mZ
+    SigmaZPred <- PredZObj$SigmaZ
+    
+    xi <- FitPredY(X = mXtest, mZ = mZPred, SigmaZ = SigmaZPred, m_mu1 = m_mu1, m_mu0 = m_mu0, Sigma_Mu1 = Sigma_Mu1, Sigma_Mu0 = Sigma_Mu0, mEpsilonInvMAT = EDepsInv, mLogEpsilonMAT = ElogSigmaSq, vw = vw, delta = delta, logRatio = log(n1train/n0train))
+    
+  }
+  return(list(xi=xi,vw=vw,m_mu1 = m_mu1, m_mu0 = m_mu0, m_mu = m_mu, mZ =mZ, Sigma_Z = Sigma_Z, m.tau.inv=m.tau.inv,lambdaTS=lambdaTS, zeta=zeta, EDepsInv=EDepsInv))
   
 }

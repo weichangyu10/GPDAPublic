@@ -739,3 +739,59 @@ arma::vec FitPredY(const arma::mat& X, const arma::mat& mZ, const arma::cube& Si
   const arma::vec xi = expit(logitxi);
   return xi;
 }
+
+// [[Rcpp::export]]
+List Update_Muk_Stat(const arma::vec& vy, const arma::mat& mX, const arma::mat& EDepsInv, const arma::vec vw, const arma::mat mZ, const arma::vec Qstardiag1, const double Qstaroffdiag1, const arma::vec Qstardiag0, const double Qstaroffdiag0, const arma::vec Qstardiag, const double Qstaroffdiag){
+  
+  const arma::mat I = eye(mX.n_cols, mX.n_cols);
+  const arma::mat W = diagmat(vw);
+  const int T = mX.n_cols;
+  const int n1 = sum(vy);
+  const int n0 = vy.n_elem - n1;
+  const int n = n1 + n0;
+  //arma::sp_mat PrecMu1 = sp_mat( (n1*m_sigma2_inv)*W + Qstar1);
+  //arma::mat Sigma_Mu1 = InvSymTDMat(PrecMu1);
+  //arma::sp_mat PrecMu0 = sp_mat( (n0*m_sigma2_inv)*W + Qstar1);
+  //arma::mat Sigma_Mu0 = InvSymTDMat(PrecMu0);
+  //arma::mat PrecMu1 = (n1*m_sigma2_inv)*W + Qstar1;
+  //remember that Qstardiag1 needs to be multiplied by 1/tau tilde1
+  arma::vec PrecMu1_maindiag = ( n1*EDepsInv.col(0)%vw + Qstardiag1);
+  arma::vec PrecMu1_offdiag(T);
+  PrecMu1_offdiag.fill(Qstaroffdiag1);
+  PrecMu1_offdiag(T-1) = 0.0;
+  arma::vec PrecMu0_offdiag(T);
+  PrecMu0_offdiag.fill(Qstaroffdiag0);
+  PrecMu0_offdiag(T-1) = 0.0;
+  //arma::mat Sigma_Mu1 = BandedCholToInv(PrecMu1_maindiag, Qstaroffdiag1);
+  arma::vec PrecMu0_maindiag = ( n1*EDepsInv.col(1)%vw + Qstardiag0);
+  //arma::mat Sigma_Mu0 = BandedCholToInv(PrecMu0_maindiag, Qstaroffdiag0);
+  arma::mat Sigma_Mu1 = BandedCholToInvNonStat2(PrecMu1_maindiag, PrecMu1_offdiag);
+  arma::mat Sigma_Mu0 = BandedCholToInvNonStat2(PrecMu0_maindiag, PrecMu0_offdiag);
+  arma::vec PrecMu_maindiag = ( n*EDepsInv.col(2)%(ones(T)-vw) + Qstardiag);
+  arma::vec PrecMu_offdiag(T);
+  PrecMu_offdiag.fill(Qstaroffdiag);
+  PrecMu_offdiag(T-1) = 0.0;
+  arma::mat Sigma_Mu = BandedCholToInvNonStat2(PrecMu_maindiag, PrecMu_offdiag);
+  
+  
+  
+  const uvec inds1 = find(vy == 1);
+  const uvec inds0 = find(vy == 0);
+  const arma::mat Xtrain1 = mX.rows(inds1);
+  const arma::mat Xtrain0 =  mX.rows(inds0);
+  const arma::mat mZ1 =  mZ.rows(inds1);
+  const arma::mat mZ0 =  mZ.rows(inds0);
+  
+  arma::vec wtempD1 = EDepsInv.col(0)%(vw%(sum( (Xtrain1 - mZ1), 0)).t());
+  arma::vec m_mu1 = ThomasAlgo2(PrecMu1_offdiag.rows(0,T-2), PrecMu1_maindiag, PrecMu1_offdiag.rows(0,T-2), wtempD1);
+  
+  arma::vec wtempD0 = EDepsInv.col(1)%(vw%(sum( (Xtrain0 - mZ0), 0)).t());
+  arma::vec m_mu0 = ThomasAlgo2(PrecMu0_offdiag.rows(0,T-2), PrecMu0_maindiag, PrecMu0_offdiag.rows(0,T-2), wtempD0);
+  
+  arma::vec wtempD = EDepsInv.col(2)%( (ones(T)-vw)%(sum( (mX - mZ), 0)).t());
+  arma::vec m_mu = ThomasAlgo2(PrecMu_offdiag.rows(0,T-2), PrecMu_maindiag, PrecMu_offdiag.rows(0,T-2), wtempD);
+  
+  
+  return Rcpp::List::create(Rcpp::Named("m_mu1") = m_mu1, Rcpp::Named("m_mu0") = m_mu0, Rcpp::Named("m_mu") = m_mu, Rcpp::Named("Sigma_Mu1") = Sigma_Mu1, Rcpp::Named("Sigma_Mu0") = Sigma_Mu0, Rcpp::Named("Sigma_Mu") = Sigma_Mu);
+  
+}

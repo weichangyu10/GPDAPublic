@@ -1,3 +1,7 @@
+list.of.packages <- c("Matrix", "Rcpp", "RcppArmadillo","mvtnorm", "optimization", "matrixStats", "pracma", "penalizedLDA", "caret", "randomForest", "LiblineaR", "sparseLDA", "caret", "keras", "Rfast", "nloptr", "inline", "lbfgs")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
 library(Matrix)
 library(Rcpp)
 library(RcppArmadillo)
@@ -5,20 +9,26 @@ library(mvtnorm)
 library(optimization)
 library(matrixStats)
 library(pracma)
-library(VaDA)
+#library(VaDA)
 library(penalizedLDA)
 library(caret)
 library(randomForest)
 library(LiblineaR)
 library(sparseLDA)
+library(caret)
+library(keras)
 sourceCpp("GPDAnonStatFinal.cpp")
 source("GPDARversionFinal.R")
+source("CNNcode.R")
 
 n.varbs <- 5000
 nTrain <- 100
 nTest <- 500
 delta <- 1
 n.reps <- 50
+
+#takes values from {1,2,3,4}
+sim.set <- 1
 
 if(sim.set == 1){
   
@@ -56,6 +66,8 @@ if(sim.set == 4){
 Lambda_vec<-10^(seq(-3,2,1))
 Lambda2_vec<-10^(seq(-3,2,1))
 LambdaSparseLDA_vec<-c(1e-6,1e-4,1e-3,.1,1,10)
+CNNsettings <- expand.grid(c(5,10,15,20), c(10,20,30,40))
+names(CNNsettings) <- c("FILTERS","KERNELS")
 
 Errors1 <- rep(0,n.reps)
 Errors2 <- rep(0,n.reps)
@@ -65,6 +77,8 @@ Errors5 <- rep(0,n.reps)
 Errors6 <- rep(0,n.reps)
 Errors7 <- rep(0,n.reps)
 Errors8 <- rep(0,n.reps)
+Errors9 <- rep(0,n.reps)
+Errors10 <- rep(0,n.reps)
 
 RecordChoose1 <- matrix(0, n.reps, n.varbs)
 RecordChoose2 <- matrix(0, n.reps, n.varbs)
@@ -73,6 +87,7 @@ RecordChoose4 <- matrix(0, n.reps, n.varbs)
 RecordChoose5 <- matrix(0, n.reps, n.varbs)
 RecordChoose6 <- matrix(0, n.reps, n.varbs)
 RecordChoose8 <- matrix(0, n.reps, n.varbs)
+RecordChoose9 <- matrix(0, n.reps, n.varbs)
 
 MCC1 <- rep(0,n.reps)
 MCC2 <- rep(0,n.reps)
@@ -81,6 +96,7 @@ MCC4 <- rep(0,n.reps)
 MCC5 <- rep(0,n.reps)
 MCC6 <- rep(0,n.reps)
 MCC8 <- rep(0,n.reps)
+MCC9 <- rep(0,n.reps)
 
 for(sim.rep in 1:n.reps){
   
@@ -92,11 +108,11 @@ for(sim.rep in 1:n.reps){
   RecordChoose1[sim.rep,] <- round(GPobj$vw)
   MCC1[sim.rep] <- Calc.MCC(predvec =RecordChoose1[sim.rep,], truevec = gamma.true)
   
-  #Fit VNPDA model 
-  VNPDAobj <- VNPDA(X.train,vy.train,X.test,rep(1,n.varbs),1,1,1,n.varbs,maxdepth=10)
-  Errors2[sim.rep] <- sum(abs(vy.test!=VNPDAobj$ClassPred))
-  RecordChoose2[sim.rep,] <- c(round(VNPDAobj$omega))
-  MCC2[sim.rep] <- Calc.MCC(predvec =RecordChoose2[sim.rep,], truevec = gamma.true)
+  #Fit VNPDA model(run if you installed VaDA)
+  #VNPDAobj <- VNPDA(X.train,vy.train,X.test,rep(1,n.varbs),1,1,1,n.varbs,maxdepth=10)
+  #Errors2[sim.rep] <- sum(abs(vy.test!=VNPDAobj$ClassPred))
+  #RecordChoose2[sim.rep,] <- c(round(VNPDAobj$omega))
+  #MCC2[sim.rep] <- Calc.MCC(predvec =RecordChoose2[sim.rep,], truevec = gamma.true)
   
   #Relabel data for to meet penLDA-FL input standards
   vy.tibs <- vy.train
@@ -132,11 +148,11 @@ for(sim.rep in 1:n.reps){
   RecordChoose4[sim.rep,which(c(rf2imp)!=0)] <- 1
   MCC4[sim.rep] <- Calc.MCC(predvec =RecordChoose4[sim.rep,], truevec = gamma.true)
   
-  #Fit VLDA
-  VLDAobj <- VLDA(vy=vy.train, mX=X.train, mXtest=X.test,r=0.98,kappa=(1/7))
-  Errors5[sim.rep] <- sum(abs(c(VLDAobj$y.hat)!=vy.test))
-  RecordChoose5[sim.rep,] <- c(VLDAobj$omega)
-  MCC5[sim.rep] <- Calc.MCC(predvec =RecordChoose5[sim.rep,], truevec = gamma.true)
+  #Fit VLDA (run if you installed VaDA)
+  #VLDAobj <- VLDA(vy=vy.train, mX=X.train, mXtest=X.test,r=0.98,kappa=(1/7))
+  #Errors5[sim.rep] <- sum(abs(c(VLDAobj$y.hat)!=vy.test))
+  #RecordChoose5[sim.rep,] <- c(VLDAobj$omega)
+  #MCC5[sim.rep] <- Calc.MCC(predvec =RecordChoose5[sim.rep,], truevec = gamma.true)
   
   #Fit SparseLDA
   ValidErrorSDA = rep(0,6)
@@ -166,6 +182,24 @@ for(sim.rep in 1:n.reps){
   RecordChoose8[sim.rep,which(c(SVMobj2$W)!=0)] <- 1
   MCC8[sim.rep] <- Calc.MCC(predvec =RecordChoose8[sim.rep,], truevec = gamma.true)
   
+  #Fit CNN
+  ValidErrorCNN = rep(0,16)
+  for(l in 1:16){
+    
+    CNN.fit.temp <- CNN.fit(Raw.X.train = X.train, Raw.Y.train = vy.train, Raw.X.test = X.train, filters.num = CNNsettings$FILTERS[l], kernels.num = CNNsettings$KERNELS[l])
+    ValidErrorCNN <- sum(CNN.fit.temp$yhat!=vy.train)
+    rm(CNN.fit.temp)
+    
+  }
+  BestCNNset <- (which.min(ValidErrorCNN))[1]
+  CNNobj <- CNN.fit(Raw.X.train = X.train, Raw.Y.train = vy.train, Raw.X.test = X.test, filters.num = CNNsettings$FILTERS[BestCNNset], kernels.num = CNNsettings$KERNELS[BestCNNset])
+  Errors9[sim.rep] <- sum(CNNobj$yhat!=vy.test)
+  
+  #Fit GPDA-stat
+  GPobjStat <- GPDA.sparse.Stat.Revised(mXtrain = X.train, vytrain = vy.train, mXtest = X.test, train.cycles = 5, test.cycles = 3, delta = 1)
+  Errors10[sim.rep] <-sum(abs(round(c(GPobjStat$xi))!=vy.test))
+  RecordChoose9[sim.rep,] <- round(c(GPobjStat$vw))
+  MCC9[sim.rep] <- Calc.MCC(predvec =RecordChoose9[sim.rep,], truevec = gamma.true)
   
   cat("Completed repetition: ", sim.rep, "\n")
   
