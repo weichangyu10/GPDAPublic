@@ -45,6 +45,7 @@ Load and import data
 #BiocManager::install("ProData")
 library(ProData)
 library(PROcess)
+library(ggplot2)
 f45c <- system.file("f45c", package="ProData")
 fs <- dir(f45c,full.names=TRUE)
 data(f45cbmk)
@@ -140,18 +141,16 @@ GPobj <- GPDA.sparse.NonStat.Proteomics(mXtrain = combineXscale, vytrain = vy, m
 
 Obtain predicted class labels
 ```{r}
-#c(GPobj$xi)
+c(GPobj$xi)
 ```
 
 Obtain posterior probability of gamma = 1 for all locations
 ```{r}
-#c(GPobj$vw)
+c(GPobj$vw)
 ```
 
 Plot posterior expectation of location-varying length scale of first observation.
 ```{r}
-#Observation-specific log length scale perturbation
-GPobj$zeta
 #Common component of log length scale perturbation
 #c(GPobj$mS)
 #Posterior expectation of length-scale for first observation

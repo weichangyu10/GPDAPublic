@@ -406,7 +406,7 @@ Vignette.pdf.</p>
 <p>Load required packages
 <code>{r,results=&#39;hide&#39;,message=FALSE,tidy=TRUE, tidy.opts=list(width.cutoff=60)} Package.Names &lt;- c(&quot;Matrix&quot;,&quot;Rcpp&quot;,&quot;RcppArmadillo&quot;,&quot;mvtnorm&quot;,&quot;optimization&quot;,&quot;matrixStats&quot;,&quot;matrixStats&quot;,&quot;ggplot2&quot;,&quot;formatR&quot;) lapply(Package.Names, library, character.only = TRUE) sourceCpp(&quot;GPDAnonStatFinal.cpp&quot;) source(&quot;GPDARversionFinal.R&quot;)</code></p>
 <p>Load and import data
-<code>{r,message=FALSE,tidy=TRUE, tidy.opts=list(width.cutoff=60)} #BiocManager::install(&quot;PROcess&quot;) #BiocManager::install(&quot;ProData&quot;) library(ProData) library(PROcess) f45c &lt;- system.file(&quot;f45c&quot;, package=&quot;ProData&quot;) fs &lt;- dir(f45c,full.names=TRUE) data(f45cbmk) SpecGrp &lt;- pData(f45cbmk) table(SpecGrp[,1])</code></p>
+<code>{r,message=FALSE,tidy=TRUE, tidy.opts=list(width.cutoff=60)} #BiocManager::install(&quot;PROcess&quot;) #BiocManager::install(&quot;ProData&quot;) library(ProData) library(PROcess) library(ggplot2) f45c &lt;- system.file(&quot;f45c&quot;, package=&quot;ProData&quot;) fs &lt;- dir(f45c,full.names=TRUE) data(f45cbmk) SpecGrp &lt;- pData(f45cbmk) table(SpecGrp[,1])</code></p>
 <p>Processed markers</p>
 <pre class="{r}"><code>explevels = exprs(f45cbmk)
 detpeaks = rownames(explevels)</code></pre>
@@ -471,14 +471,12 @@ test.cycles is the number of VB cycles for classification phase of the
 algorithm. delta is the distance between adjacent locations.</p>
 <pre class="{r}"><code>GPobj &lt;- GPDA.sparse.NonStat.Proteomics(mXtrain = combineXscale, vytrain = vy, mXtest = combineXscale, train.cycles = 5, test.cycles = 3, delta = 1)</code></pre>
 <p>Obtain predicted class labels</p>
-<pre class="{r}"><code>#c(GPobj$xi)</code></pre>
+<pre class="{r}"><code>c(GPobj$xi)</code></pre>
 <p>Obtain posterior probability of gamma = 1 for all locations</p>
-<pre class="{r}"><code>#c(GPobj$vw)</code></pre>
+<pre class="{r}"><code>c(GPobj$vw)</code></pre>
 <p>Plot posterior expectation of location-varying length scale of first
 observation.</p>
-<pre class="{r}"><code>#Observation-specific log length scale perturbation
-GPobj$zeta
-#Common component of log length scale perturbation
+<pre class="{r}"><code>#Common component of log length scale perturbation
 #c(GPobj$mS)
 #Posterior expectation of length-scale for first observation
 LengthScaleObs1 &lt;- exp(c(GPobj$mS)+GPobj$zeta[1])
