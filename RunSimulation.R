@@ -1,6 +1,6 @@
 list.of.packages <- c("Matrix", "Rcpp", "RcppArmadillo","mvtnorm", "optimization", "matrixStats", "pracma", "penalizedLDA", "caret", "randomForest", "LiblineaR", "sparseLDA", "caret", "keras", "Rfast", "nloptr", "inline", "lbfgs")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
+if(length(new.packages)>0) install.packages(new.packages)
 
 library(Matrix)
 library(Rcpp)
@@ -119,7 +119,7 @@ for(sim.rep in 1:n.reps){
   vy.tibs[vy.tibs==0] <- 2
   vy.new.tibs <- vy.test
   vy.new.tibs[vy.new.tibs==0] <- 2
-  #Use training data to find optimal tunign parameters for penLDA-FL
+  #Use training data to find optimal tuning parameters for penLDA-FL
   ValidError = matrix(0,nrow=length(Lambda_vec),ncol=length(Lambda2_vec))
   for(l in 1:length(Lambda_vec))
   {

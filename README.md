@@ -135,7 +135,7 @@ n <- length(vy)
     
 Fit GPDA model. Description of the input arguments: mXtrain is a n.train by p matrix of predictors for training dataset. vytrain is a vector of size n.train of class labels for training dataset. mXtest is an n.test by p matrix of predictors for testing dataset. train.cycles is the number of VB cycles for posterior inference phase of the algorithm. test.cycles is the number of VB cycles for classification phase of the algorithm. delta is the distance between adjacent locations.
 ```{r}
-GPobj <- GPDA.sparse.NonStat(mXtrain = combineXscale, vytrain = vy, mXtest = combineXscale, train.cycles = 5, test.cycles = 3, delta = 1)
+GPobj <- GPDA.sparse.NonStat.Proteomics(mXtrain = combineXscale, vytrain = vy, mXtest = combineXscale, train.cycles = 5, test.cycles = 3, delta = 1)
 ```
 
 Obtain predicted class labels
